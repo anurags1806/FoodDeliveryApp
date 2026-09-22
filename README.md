@@ -16,15 +16,66 @@ Built for the DMG Companies Java Developer take-home assignment.
   including two dedicated concurrency tests using real multi-threaded
   `ExecutorService` races against the actual (H2) database.
 
-## Running it
+## Setup and running
+
+### Prerequisites
+
+- Java 25
+- Maven 3.9 or newer
+- PostgreSQL 14 or newer only when running with the `prod` profile
+
+Verify the installed tools:
 
 ```bash
-mvn spring-boot:run
-# API on http://localhost:8080, H2 console on /h2-console (dev profile only)
+java -version
+mvn -version
 ```
 
+### Run locally with the dev profile
+
+The default `dev` profile uses an in-memory H2 database, so no database
+installation is required for local development.
+
 ```bash
-mvn test
+mvn clean spring-boot:run
+```
+
+The API is available at `http://localhost:8080`. The H2 console is available
+at `http://localhost:8080/h2-console` with these connection settings:
+
+| Setting | Value |
+|---|---|
+| JDBC URL | `jdbc:h2:mem:fooddelivery` |
+| User | `sa` |
+| Password | empty |
+
+### Run with PostgreSQL
+
+Create a PostgreSQL database named `fooddelivery`, then set the connection
+variables before starting the application with the `prod` profile:
+
+```powershell
+$env:DB_URL = "jdbc:postgresql://localhost:5432/fooddelivery"
+$env:DB_USERNAME = "postgres"
+$env:DB_PASSWORD = "your-password"
+$env:JWT_SECRET = "replace-with-a-long-random-secret"
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+On macOS/Linux, use `export` instead of PowerShell's `$env:` syntax.
+
+### Run the tests
+
+Tests use the `test` profile and an isolated in-memory H2 database:
+
+```bash
+mvn clean test
+```
+
+To compile production and test code without running tests:
+
+```bash
+mvn clean test-compile
 ```
 
 > **Note on this submission's provenance:** this was built with AI
