@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @EnableAsync
 public class FoodDeliveryApplication {
     public static void main(String[] args) {
+        System.out.println("Food Delivery Application is starting...");
         SpringApplication.run(FoodDeliveryApplication.class, args);
     }
 }

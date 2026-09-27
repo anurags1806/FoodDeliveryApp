@@ -51,29 +51,17 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/h2-console/**", "/actuator/health").permitAll()
-
+                .requestMatchers("/", "/api/auth/**", "/h2-console/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
                 .requestMatchers(HttpMethod.POST, "/api/restaurants").hasAnyRole("ADMIN", "RESTAURANT_OWNER")
                 .requestMatchers(HttpMethod.POST, "/api/restaurants/*/menu-items").hasRole("RESTAURANT_OWNER")
                 .requestMatchers(HttpMethod.PUT, "/api/menu-items/**").hasRole("RESTAURANT_OWNER")
                 .requestMatchers(HttpMethod.DELETE, "/api/menu-items/**").hasRole("RESTAURANT_OWNER")
-                // Specific sub-resource rule MUST be declared before the
-                // broader public GET rule below, since Spring Security
-                // uses first-match-wins over these ordered matchers.
                 .requestMatchers(HttpMethod.GET, "/api/restaurants/*/orders").hasAnyRole("RESTAURANT_OWNER", "ADMIN")
-                // Browsing cities/restaurants/menus is public (customers browse before login)
                 .requestMatchers(HttpMethod.GET, "/api/cities/**", "/api/restaurants/**").permitAll()
-
-                .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("CUSTOMER")
+                .requestMatchers(HttpMethod.POST, "/api/orders", "/api/orders/*/rating").hasRole("CUSTOMER")
                 .requestMatchers(HttpMethod.GET, "/api/orders/mine").hasRole("CUSTOMER")
-                .requestMatchers(HttpMethod.POST, "/api/orders/*/rating").hasRole("CUSTOMER")
-                .requestMatchers(HttpMethod.PATCH, "/api/orders/*/status")
-                        .hasAnyRole("ADMIN", "RESTAURANT_OWNER", "DELIVERY_PARTNER", "CUSTOMER")
-
                 .requestMatchers("/api/delivery/**").hasRole("DELIVERY_PARTNER")
-
                 .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin())) // for h2-console
