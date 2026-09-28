@@ -3,6 +3,7 @@ package com.dmg.fooddelivery.integration;
 import com.dmg.fooddelivery.model.*;
 import com.dmg.fooddelivery.repository.*;
 import com.dmg.fooddelivery.service.DeliveryService;
+import com.dmg.fooddelivery.exception.ConflictException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,12 +83,47 @@ class DeliveryAssignmentConcurrencyIntegrationTest {
     }
 
     @Test
+    void samePartnerCannotClaimTwoOrdersConcurrently() throws Exception {
+        Order second = orderRepository.save(Order.builder()
+                .customer(order.getCustomer()).restaurant(order.getRestaurant())
+                .status(OrderStatus.PREPARING).totalAmount(new BigDecimal("5.00"))
+                .paymentStatus(PaymentStatus.PAID).build());
+        DeliveryPartner partner = partners.getFirst();
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (Long orderId : List.of(order.getId(), second.getId())) {
+                results.add(pool.submit(() -> {
+                    start.await();
+                    TestAuth.loginAs(partner.getUser());
+                    try {
+                        deliveryService.acceptOrder(orderId);
+                        return true;
+                    } catch (ConflictException expected) {
+                        return false;
+                    } finally {
+                        TestAuth.clear();
+                    }
+                }));
+            }
+            start.countDown();
+            int successes = 0;
+            for (Future<Boolean> result : results) {
+                if (result.get(30, TimeUnit.SECONDS)) successes++;
+            }
+            assertThat(successes).isEqualTo(1);
+        }
+        assertThat(orderRepository.findByDeliveryPartnerId(partner.getId())).hasSize(1);
+    }
+
+    @Test
     void exactlyOnePartnerWinsTheOrder() throws InterruptedException {
         ExecutorService pool = Executors.newFixedThreadPool(CONCURRENT_PARTNERS);
         CountDownLatch startLine = new CountDownLatch(1);
         CountDownLatch finishLine = new CountDownLatch(CONCURRENT_PARTNERS);
         AtomicInteger succeeded = new AtomicInteger(0);
         AtomicInteger failed = new AtomicInteger(0);
+        ConcurrentLinkedQueue<Throwable> unexpected = new ConcurrentLinkedQueue<>();
 
         for (DeliveryPartner partner : partners) {
             pool.submit(() -> {
@@ -96,8 +132,10 @@ class DeliveryAssignmentConcurrencyIntegrationTest {
                     TestAuth.loginAs(partner.getUser());
                     deliveryService.acceptOrder(order.getId());
                     succeeded.incrementAndGet();
-                } catch (Exception e) {
+                } catch (ConflictException e) {
                     failed.incrementAndGet();
+                } catch (Exception e) {
+                    unexpected.add(e);
                 } finally {
                     TestAuth.clear();
                     finishLine.countDown();
@@ -110,6 +148,7 @@ class DeliveryAssignmentConcurrencyIntegrationTest {
         pool.shutdown();
 
         assertThat(completed).isTrue();
+        assertThat(unexpected).isEmpty();
         assertThat(succeeded.get()).isEqualTo(1);
         assertThat(failed.get()).isEqualTo(CONCURRENT_PARTNERS - 1);
 

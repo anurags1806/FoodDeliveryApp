@@ -4,6 +4,7 @@ import com.dmg.fooddelivery.model.User;
 import com.dmg.fooddelivery.security.UserPrincipal;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.Objects;
 
 /**
  * SecurityContextHolder defaults to a ThreadLocal strategy, so each thread
@@ -15,7 +16,7 @@ public final class TestAuth {
     private TestAuth() {}
 
     public static void loginAs(User user) {
-        UserPrincipal principal = new UserPrincipal(user);
+        UserPrincipal principal = new UserPrincipal(Objects.requireNonNull(user, "Test user must not be null"));
         var token = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(token);
     }

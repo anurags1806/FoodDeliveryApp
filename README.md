@@ -9,7 +9,7 @@ Built for the DMG Companies Java Developer take-home assignment.
 
 ## Stack
 
-- **Java 25, Spring Boot 3.3.4** (Web, Data JPA, Security, Validation)
+- **Java 21, Spring Boot 3.3.4** (Web, Data JPA, Security, Validation)
 - **H2** (in-memory) for `dev`/`test` profiles, **PostgreSQL** wired for `prod`
 - **JJWT** for stateless JWT auth
 - **JUnit 5 + AssertJ + Spring Boot Test** for unit/integration tests,
@@ -20,7 +20,7 @@ Built for the DMG Companies Java Developer take-home assignment.
 
 ### Prerequisites
 
-- Java 25
+- Java 21
 - Maven 3.9 or newer
 - PostgreSQL 14 or newer only when running with the `prod` profile
 
@@ -30,6 +30,9 @@ Verify the installed tools:
 java -version
 mvn -version
 ```
+
+Maven must report Java 21 or newer. If it selects an older installed JDK,
+set `JAVA_HOME` to your Java 21 installation before running Maven.
 
 ### Run locally with the dev profile
 
@@ -78,13 +81,19 @@ To compile production and test code without running tests:
 mvn clean test-compile
 ```
 
-> **Note on this submission's provenance:** this was built with AI
-> assistance in an environment with no Maven/network access, so the code
-> was hand-written against known Spring Boot 3.3 / Hibernate 6 APIs
-> rather than compiled iteratively. Run `mvn clean verify` before
-> relying on it and treat any compile error as a (hopefully small)
-> integration bug to fix, not a design problem. See `CLAUDE.md` for the
-> full AI workflow.
+Run `mvn clean verify` to compile with unchecked/deprecation warnings enabled,
+run the unit and integration tests, and package the application. The tests
+include HTTP authorization and validation checks, lifecycle regressions,
+and concurrent stock and delivery assignment checks against H2.
+
+### Null safety
+
+Services and repositories use Spring's `@NonNullApi` contract. Optional fields
+are marked `@Nullable`, and Spring overrides use explicit `@NonNull` annotations.
+These Spring annotations document nullability for tooling; runtime validation
+comes from `@Validated`, `@NotNull`, and `@Valid` on Spring-managed service calls.
+Required constructor/event inputs use explicit guards or Lombok `@NonNull`.
+Request DTOs retain Bean Validation so missing required JSON fields return 400.
 
 ## Scope & assumptions
 
@@ -191,8 +200,8 @@ check), only by that order's own customer, only after `DELIVERED`.
   `security`), which is the right granularity for "avoid distributed
   systems" while still being organized.
 - No OAuth/SSO/MFA - plain email+password with BCrypt, JWT issuance.
-- No production observability (metrics/tracing/alerting) beyond
-  Spring's default `/actuator/health`.
+- No production observability (metrics/tracing/alerting). `GET /` provides
+  a basic application status response; Actuator is not installed.
 
 ### Smaller assumptions
 - Prices are snapshotted onto `OrderItem.priceAtOrder` at order time, so
