@@ -2,6 +2,7 @@ package com.dmg.fooddelivery.dto.response;
 
 import com.dmg.fooddelivery.model.OrderStatus;
 import com.dmg.fooddelivery.model.PaymentStatus;
+import org.springframework.lang.Nullable;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -16,7 +17,7 @@ public record OrderResponse(
         OrderStatus status,
         PaymentStatus paymentStatus,
         BigDecimal totalAmount,
-        Long deliveryPartnerId,
+        @Nullable Long deliveryPartnerId,
         Instant createdAt,
-        Instant updatedAt
+        @Nullable Instant updatedAt
 ) {}

@@ -7,7 +7,6 @@ import com.dmg.fooddelivery.dto.response.OrderResponse;
 import com.dmg.fooddelivery.dto.response.RatingResponse;
 import com.dmg.fooddelivery.exception.ForbiddenException;
 import com.dmg.fooddelivery.model.Order;
-import com.dmg.fooddelivery.model.Role;
 import com.dmg.fooddelivery.model.User;
 import com.dmg.fooddelivery.security.SecurityUtils;
 import com.dmg.fooddelivery.service.OrderService;
@@ -15,10 +14,12 @@ import com.dmg.fooddelivery.service.RatingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -29,7 +30,7 @@ public class OrderController {
     private final RatingService ratingService;
 
     @PostMapping
-    public ResponseEntity<OrderResponse> placeOrder(@Valid @RequestBody PlaceOrderRequest request) {
+    public ResponseEntity<OrderResponse> placeOrder(@NonNull @Valid @RequestBody PlaceOrderRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(orderService.placeOrder(request));
     }
 
@@ -39,7 +40,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<OrderResponse> getById(@PathVariable Long id) {
+    public ResponseEntity<OrderResponse> getById(@NonNull @PathVariable Long id) {
         Order order = orderService.getEntityOrThrow(id);
         assertCanView(order);
         return ResponseEntity.ok(orderService.toResponse(order));
@@ -54,13 +55,13 @@ public class OrderController {
      * owning restaurant", etc.
      */
     @PatchMapping("/{id}/status")
-    public ResponseEntity<OrderResponse> updateStatus(@PathVariable Long id,
-                                                        @Valid @RequestBody UpdateOrderStatusRequest request) {
-        return ResponseEntity.ok(orderService.updateStatus(id, request.status()));
+    public ResponseEntity<OrderResponse> updateStatus(@NonNull @PathVariable Long id,
+                                                        @NonNull @Valid @RequestBody UpdateOrderStatusRequest request) {
+        return ResponseEntity.ok(orderService.updateStatus(id, Objects.requireNonNull(request.status())));
     }
 
     @PostMapping("/{id}/rating")
-    public ResponseEntity<RatingResponse> rate(@PathVariable Long id, @Valid @RequestBody RatingRequest request) {
+    public ResponseEntity<RatingResponse> rate(@NonNull @PathVariable Long id, @NonNull @Valid @RequestBody RatingRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ratingService.rate(id, request));
     }
 

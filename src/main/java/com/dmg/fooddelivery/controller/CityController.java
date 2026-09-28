@@ -6,6 +6,7 @@ import com.dmg.fooddelivery.service.CityService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,7 +20,7 @@ public class CityController {
 
     /** Admin-only: managing cities is part of the admin role's scope. */
     @PostMapping("/api/admin/cities")
-    public ResponseEntity<CityResponse> create(@Valid @RequestBody CityRequest request) {
+    public ResponseEntity<CityResponse> create(@NonNull @Valid @RequestBody CityRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(cityService.create(request));
     }
 

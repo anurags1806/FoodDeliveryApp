@@ -8,5 +8,5 @@ import java.util.List;
 
 public record PlaceOrderRequest(
         @NotNull Long restaurantId,
-        @NotEmpty @Valid List<OrderItemRequest> items
+        @NotEmpty @Valid List<@NotNull OrderItemRequest> items
 ) {}

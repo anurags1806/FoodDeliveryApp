@@ -3,8 +3,9 @@ package com.dmg.fooddelivery.dto.request;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.lang.Nullable;
 
 public record RatingRequest(
         @NotNull @Min(1) @Max(5) Integer score,
-        String comment
+        @Nullable String comment
 ) {}

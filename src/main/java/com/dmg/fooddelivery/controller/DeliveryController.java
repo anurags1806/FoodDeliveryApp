@@ -7,6 +7,7 @@ import com.dmg.fooddelivery.service.DeliveryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +21,7 @@ public class DeliveryController {
     private final DeliveryService deliveryService;
 
     @PostMapping("/partners")
-    public ResponseEntity<DeliveryPartnerResponse> register(@Valid @RequestBody RegisterDeliveryPartnerRequest request) {
+    public ResponseEntity<DeliveryPartnerResponse> register(@NonNull @Valid @RequestBody RegisterDeliveryPartnerRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(deliveryService.register(request));
     }
 
@@ -32,7 +33,7 @@ public class DeliveryController {
 
     /** The contended operation - see DeliveryService#acceptOrder for the locking strategy. */
     @PostMapping("/orders/{orderId}/accept")
-    public ResponseEntity<OrderResponse> accept(@PathVariable Long orderId) {
+    public ResponseEntity<OrderResponse> accept(@NonNull @PathVariable Long orderId) {
         return ResponseEntity.ok(deliveryService.acceptOrder(orderId));
     }
 }
