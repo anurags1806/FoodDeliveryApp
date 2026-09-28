@@ -3,10 +3,12 @@ package com.dmg.fooddelivery.service;
 import com.dmg.fooddelivery.model.Order;
 import com.dmg.fooddelivery.model.OrderStatus;
 import lombok.extern.slf4j.Slf4j;
+import lombok.NonNull;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import java.util.Objects;
 
 /**
  * Fans a status change out to the customer, restaurant, and (once assigned)
@@ -26,6 +28,7 @@ public class NotificationService {
     @Async("notificationExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onOrderStatusChanged(OrderStatusChangedEvent event) {
+        Objects.requireNonNull(event, "event must not be null");
         Order order = event.order();
         OrderStatus status = event.newStatus();
 
@@ -48,5 +51,5 @@ public class NotificationService {
         log.info("[notify:partner={}] order={} status={}", order.getDeliveryPartner().getId(), order.getId(), status);
     }
 
-    public record OrderStatusChangedEvent(Order order, OrderStatus newStatus) {}
+    public record OrderStatusChangedEvent(@NonNull Order order, @NonNull OrderStatus newStatus) {}
 }

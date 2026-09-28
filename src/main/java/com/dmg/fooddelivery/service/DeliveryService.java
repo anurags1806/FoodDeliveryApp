@@ -1,5 +1,7 @@
 package com.dmg.fooddelivery.service;
 
+import static java.util.Objects.requireNonNull;
+
 import com.dmg.fooddelivery.dto.request.RegisterDeliveryPartnerRequest;
 import com.dmg.fooddelivery.dto.response.DeliveryPartnerResponse;
 import com.dmg.fooddelivery.dto.response.OrderResponse;
@@ -12,12 +14,16 @@ import com.dmg.fooddelivery.repository.DeliveryPartnerRepository;
 import com.dmg.fooddelivery.repository.OrderRepository;
 import com.dmg.fooddelivery.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@Validated
 @RequiredArgsConstructor
 public class DeliveryService {
 
@@ -27,15 +33,15 @@ public class DeliveryService {
     private final OrderService orderService;
 
     @Transactional
-    public DeliveryPartnerResponse register(RegisterDeliveryPartnerRequest request) {
+    public DeliveryPartnerResponse register(@NotNull @Valid RegisterDeliveryPartnerRequest request) {
         User caller = SecurityUtils.currentUser();
         if (caller.getRole() != Role.DELIVERY_PARTNER) {
             throw new ForbiddenException("Only delivery-partner accounts can register as a partner");
         }
-        if (deliveryPartnerRepository.findByUserId(caller.getId()).isPresent()) {
+        if (deliveryPartnerRepository.findByUserId(SecurityUtils.currentUserId()).isPresent()) {
             throw new BadRequestException("Delivery partner profile already exists for this user");
         }
-        City city = cityService.getOrThrow(request.cityId());
+        City city = cityService.getOrThrow(requireNonNull(request.cityId()));
         DeliveryPartner partner = DeliveryPartner.builder()
                 .user(caller)
                 .city(city)
@@ -46,10 +52,11 @@ public class DeliveryService {
     }
 
     /** Orders in PREPARING state, unassigned, in the partner's city - the pool partners contend over. */
+    @Transactional(readOnly = true)
     public List<OrderResponse> listAssignableOrders() {
         DeliveryPartner partner = getCurrentPartnerOrThrow();
-        return orderRepository.findAssignableOrdersByCity(partner.getCity().getId())
-                .stream().map(orderService::toResponse).toList();
+        return requireNonNull(orderRepository.findAssignableOrdersByCity(requireNonNull(partner.getCity().getId()))
+                .stream().map(orderService::toResponse).toList());
     }
 
     /**
@@ -66,18 +73,16 @@ public class DeliveryService {
      * orders from two racing requests either.
      */
     @Transactional
-    public OrderResponse acceptOrder(Long orderId) {
-        DeliveryPartner partner = getCurrentPartnerOrThrow();
+    public OrderResponse acceptOrder(@NotNull Long orderId) {
+        Order order = requireNonNull(orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new NotFoundException("Order not found: " + orderId)));
 
-        DeliveryPartner lockedPartner = deliveryPartnerRepository.findByIdForUpdate(partner.getId())
-                .orElseThrow(() -> new NotFoundException("Delivery partner not found"));
+        DeliveryPartner lockedPartner = requireNonNull(deliveryPartnerRepository.findByUserIdForUpdate(SecurityUtils.currentUserId())
+                .orElseThrow(() -> new NotFoundException("Delivery partner not found")));
         if (lockedPartner.getStatus() != DeliveryPartnerStatus.AVAILABLE) {
             throw new ConflictException("You are not available to accept new orders (current status: "
                     + lockedPartner.getStatus() + ")");
         }
-
-        Order order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
 
         if (order.getDeliveryPartner() != null) {
             throw new ConflictException("Order has already been claimed by another delivery partner");
@@ -98,9 +103,8 @@ public class DeliveryService {
     }
 
     private DeliveryPartner getCurrentPartnerOrThrow() {
-        User caller = SecurityUtils.currentUser();
-        return deliveryPartnerRepository.findByUserId(caller.getId())
-                .orElseThrow(() -> new NotFoundException("No delivery partner profile for current user"));
+        return requireNonNull(deliveryPartnerRepository.findByUserId(SecurityUtils.currentUserId())
+                .orElseThrow(() -> new NotFoundException("No delivery partner profile for current user")));
     }
 
     private DeliveryPartnerResponse toResponse(DeliveryPartner p) {

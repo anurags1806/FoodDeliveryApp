@@ -64,7 +64,7 @@ public class Order {
     @Version
     private Long version;
 
-    public void addItem(OrderItem item) {
+    public void addItem(@NonNull OrderItem item) {
         items.add(item);
         item.setOrder(this);
     }

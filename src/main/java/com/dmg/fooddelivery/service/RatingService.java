@@ -1,5 +1,7 @@
 package com.dmg.fooddelivery.service;
 
+import static java.util.Objects.requireNonNull;
+
 import com.dmg.fooddelivery.dto.request.RatingRequest;
 import com.dmg.fooddelivery.dto.response.RatingResponse;
 import com.dmg.fooddelivery.exception.BadRequestException;
@@ -12,12 +14,16 @@ import com.dmg.fooddelivery.model.User;
 import com.dmg.fooddelivery.repository.RatingRepository;
 import com.dmg.fooddelivery.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@Validated
 @RequiredArgsConstructor
 public class RatingService {
 
@@ -25,7 +31,7 @@ public class RatingService {
     private final OrderService orderService;
 
     @Transactional
-    public RatingResponse rate(Long orderId, RatingRequest request) {
+    public RatingResponse rate(@NotNull Long orderId, @NotNull @Valid RatingRequest request) {
         Order order = orderService.getEntityOrThrow(orderId);
         User caller = SecurityUtils.currentUser();
 
@@ -50,8 +56,8 @@ public class RatingService {
         return toResponse(rating);
     }
 
-    public List<RatingResponse> listForRestaurant(Long restaurantId) {
-        return ratingRepository.findByRestaurantId(restaurantId).stream().map(this::toResponse).toList();
+    public List<RatingResponse> listForRestaurant(@NotNull Long restaurantId) {
+        return requireNonNull(ratingRepository.findByRestaurantId(restaurantId).stream().map(this::toResponse).toList());
     }
 
     private RatingResponse toResponse(Rating r) {

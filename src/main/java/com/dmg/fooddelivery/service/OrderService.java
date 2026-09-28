@@ -1,5 +1,7 @@
 package com.dmg.fooddelivery.service;
 
+import static java.util.Objects.requireNonNull;
+
 import com.dmg.fooddelivery.dto.request.OrderItemRequest;
 import com.dmg.fooddelivery.dto.request.PlaceOrderRequest;
 import com.dmg.fooddelivery.dto.response.OrderItemResponse;
@@ -14,6 +16,9 @@ import com.dmg.fooddelivery.repository.MenuItemRepository;
 import com.dmg.fooddelivery.repository.OrderRepository;
 import com.dmg.fooddelivery.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +29,7 @@ import java.util.Comparator;
 import java.util.List;
 
 @Service
+@Validated
 @RequiredArgsConstructor
 public class OrderService {
 
@@ -46,12 +52,15 @@ public class OrderService {
      * rolls back - no partial stock decrement, no orphaned order.
      */
     @Transactional
-    public OrderResponse placeOrder(PlaceOrderRequest request) {
+    public OrderResponse placeOrder(@NotNull @Valid PlaceOrderRequest request) {
         User customer = SecurityUtils.currentUser();
-        Restaurant restaurant = restaurantService.getEntityOrThrow(request.restaurantId());
+        Restaurant restaurant = restaurantService.getEntityOrThrow(requireNonNull(request.restaurantId()));
+        if (!restaurant.isActive()) {
+            throw new ConflictException("Restaurant is not accepting orders");
+        }
 
         List<OrderItemRequest> sortedItems = request.items().stream()
-                .sorted(Comparator.comparing(OrderItemRequest::menuItemId))
+                .sorted(Comparator.comparing(item -> requireNonNull(item.menuItemId())))
                 .toList();
 
         Order order = Order.builder()
@@ -62,8 +71,8 @@ public class OrderService {
 
         BigDecimal total = BigDecimal.ZERO;
         for (OrderItemRequest itemReq : sortedItems) {
-            MenuItem menuItem = menuItemRepository.findByIdForUpdate(itemReq.menuItemId())
-                    .orElseThrow(() -> new NotFoundException("Menu item not found: " + itemReq.menuItemId()));
+            MenuItem menuItem = requireNonNull(menuItemRepository.findByIdForUpdate(requireNonNull(itemReq.menuItemId()))
+                    .orElseThrow(() -> new NotFoundException("Menu item not found: " + requireNonNull(itemReq.menuItemId()))));
 
             if (!menuItem.getRestaurant().getId().equals(restaurant.getId())) {
                 throw new BadRequestException("Menu item " + menuItem.getId() + " does not belong to restaurant " + restaurant.getId());
@@ -106,11 +115,11 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderResponse updateStatus(Long orderId, OrderStatus newStatus) {
+    public OrderResponse updateStatus(@NotNull Long orderId, @NotNull OrderStatus newStatus) {
         // Lock the order row so a concurrent status update (or delivery
         // partner assignment) can't race this one.
-        Order order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new NotFoundException("Order not found: " + orderId));
+        Order order = requireNonNull(orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new NotFoundException("Order not found: " + orderId)));
 
         User caller = SecurityUtils.currentUser();
         authorizeStatusChange(order, caller, newStatus);
@@ -128,8 +137,8 @@ public class OrderService {
         if (newStatus == OrderStatus.CANCELLED || newStatus == OrderStatus.REJECTED) {
             releaseStock(order);
         }
-        if (newStatus == OrderStatus.DELIVERED && order.getDeliveryPartner() != null) {
-            releaseDeliveryPartner(order.getDeliveryPartner().getId());
+        if (newStatus.isTerminal() && order.getDeliveryPartner() != null) {
+            releaseDeliveryPartner(requireNonNull(order.getDeliveryPartner().getId()));
         }
 
         order = orderRepository.save(order);
@@ -138,9 +147,10 @@ public class OrderService {
     }
 
     private void releaseStock(Order order) {
-        for (OrderItem item : order.getItems()) {
-            MenuItem menuItem = menuItemRepository.findByIdForUpdate(item.getMenuItem().getId())
-                    .orElseThrow(() -> new NotFoundException("Menu item not found: " + item.getMenuItem().getId()));
+        for (OrderItem item : order.getItems().stream()
+                .sorted(Comparator.comparing(i -> i.getMenuItem().getId())).toList()) {
+            MenuItem menuItem = requireNonNull(menuItemRepository.findByIdForUpdate(requireNonNull(item.getMenuItem().getId()))
+                    .orElseThrow(() -> new NotFoundException("Menu item not found: " + requireNonNull(item.getMenuItem().getId()))));
             menuItem.setStockQuantity(menuItem.getStockQuantity() + item.getQuantity());
             menuItemRepository.save(menuItem);
         }
@@ -158,7 +168,7 @@ public class OrderService {
         switch (caller.getRole()) {
             case ADMIN -> { /* admin can do anything */ }
             case RESTAURANT_OWNER -> {
-                restaurantService.assertOwnershipOrAdmin(order.getRestaurant(), caller);
+                restaurantService.assertOwnershipOrAdmin(requireNonNull(order.getRestaurant()), caller);
                 if (newStatus != OrderStatus.ACCEPTED && newStatus != OrderStatus.REJECTED
                         && newStatus != OrderStatus.PREPARING) {
                     throw new ForbiddenException("Restaurant owner cannot set status to " + newStatus);
@@ -183,37 +193,41 @@ public class OrderService {
         }
     }
 
-    public OrderResponse getById(Long id) {
+    @Transactional(readOnly = true)
+    public OrderResponse getById(@NotNull Long id) {
         return toResponse(getEntityOrThrow(id));
     }
 
-    public Order getEntityOrThrow(Long id) {
-        return orderRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Order not found: " + id));
+    public Order getEntityOrThrow(@NotNull Long id) {
+        return requireNonNull(orderRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Order not found: " + id)));
     }
 
-    public List<OrderResponse> listForCustomer(Long customerId) {
-        return orderRepository.findByCustomerId(customerId).stream().map(this::toResponse).toList();
+    @Transactional(readOnly = true)
+    public List<OrderResponse> listForCustomer(@NotNull Long customerId) {
+        return requireNonNull(orderRepository.findByCustomerId(customerId).stream().map(this::toResponse).toList());
     }
 
-    public List<OrderResponse> listForRestaurant(Long restaurantId) {
-        return orderRepository.findByRestaurantId(restaurantId).stream().map(this::toResponse).toList();
+    @Transactional(readOnly = true)
+    public List<OrderResponse> listForRestaurant(@NotNull Long restaurantId) {
+        return requireNonNull(orderRepository.findByRestaurantId(restaurantId).stream().map(this::toResponse).toList());
     }
 
-    public List<OrderResponse> listForDeliveryPartner(Long deliveryPartnerId) {
-        return orderRepository.findByDeliveryPartnerId(deliveryPartnerId).stream().map(this::toResponse).toList();
+    @Transactional(readOnly = true)
+    public List<OrderResponse> listForDeliveryPartner(@NotNull Long deliveryPartnerId) {
+        return requireNonNull(orderRepository.findByDeliveryPartnerId(deliveryPartnerId).stream().map(this::toResponse).toList());
     }
 
-    public OrderResponse toResponse(Order order) {
+    public OrderResponse toResponse(@NotNull Order order) {
         List<OrderItemResponse> items = order.getItems().stream()
                 .map(i -> new OrderItemResponse(i.getMenuItem().getId(), i.getMenuItem().getName(),
                         i.getQuantity(), i.getPriceAtOrder()))
                 .toList();
         return new OrderResponse(
-                order.getId(), order.getCustomer().getId(), order.getRestaurant().getId(),
-                order.getRestaurant().getName(), items, order.getStatus(), order.getPaymentStatus(),
+                order.getId(), order.getCustomer().getId(), requireNonNull(order.getRestaurant()).getId(),
+                requireNonNull(order.getRestaurant()).getName(), items, order.getStatus(), order.getPaymentStatus(),
                 order.getTotalAmount(),
-                order.getDeliveryPartner() != null ? order.getDeliveryPartner().getId() : null,
+                order.getDeliveryPartner() != null ? requireNonNull(order.getDeliveryPartner().getId()) : null,
                 order.getCreatedAt(), order.getUpdatedAt());
     }
 }

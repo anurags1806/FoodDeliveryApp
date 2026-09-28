@@ -14,6 +14,10 @@ public interface DeliveryPartnerRepository extends JpaRepository<DeliveryPartner
 
     Optional<DeliveryPartner> findByUserId(Long userId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select dp from DeliveryPartner dp where dp.user.id = :userId")
+    Optional<DeliveryPartner> findByUserIdForUpdate(@Param("userId") Long userId);
+
     List<DeliveryPartner> findByCityIdAndStatus(Long cityId, com.dmg.fooddelivery.model.DeliveryPartnerStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

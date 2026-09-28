@@ -3,6 +3,7 @@ package com.dmg.fooddelivery.service;
 import com.dmg.fooddelivery.model.PaymentStatus;
 import com.dmg.fooddelivery.model.User;
 import org.springframework.stereotype.Service;
+import org.springframework.lang.Nullable;
 
 import java.math.BigDecimal;
 
@@ -17,7 +18,7 @@ import java.math.BigDecimal;
 @Service
 public class PaymentService {
 
-    public PaymentStatus charge(User customer, BigDecimal amount) {
+    public PaymentStatus charge(User customer, @Nullable BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) {
             return PaymentStatus.FAILED;
         }
